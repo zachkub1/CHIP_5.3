@@ -1,12 +1,27 @@
 class MoviesController < ApplicationController
+  SORT_COLUMNS = %w[title release_date].freeze
+
   before_action :set_movie, only: %i[ show edit update destroy ]
 
   # GET /movies or /movies.json
   def index
+    if params[:ratings].nil? && params[:sort_by].nil?
+      # Landed without sorting/filtering params: restore remembered settings
+      if session[:ratings].present? || session[:sort_by].present?
+        redirect_to movies_path(ratings: session[:ratings]&.index_with { "1" },
+                                sort_by: session[:sort_by]) and return
+      end
+    else
+      session[:ratings] = params[:ratings].respond_to?(:keys) ? params[:ratings].keys : nil
+      session[:sort_by] = SORT_COLUMNS.include?(params[:sort_by]) ? params[:sort_by] : nil
+    end
+
     @all_ratings = Movie.all_ratings
-    selected = params[:ratings].respond_to?(:keys) ? params[:ratings].keys : nil
+    selected = session[:ratings]
     @ratings_to_show = selected.presence || @all_ratings
+    @sort_by = session[:sort_by]
     @movies = Movie.with_ratings(selected)
+    @movies = @movies.order(@sort_by) if @sort_by
   end
 
   # GET /movies/1 or /movies/1.json
